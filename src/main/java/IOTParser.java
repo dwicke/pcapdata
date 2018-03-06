@@ -7,9 +7,7 @@ import io.pkts.packet.UDPPacket;
 import io.pkts.protocol.Protocol;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -104,7 +102,7 @@ public class IOTParser {
         Path path = Paths.get("/home/dwicke/tcpdata.txt");
 
         //Use try-with-resource to get auto-closeable writer instance
-        try (BufferedWriter writer = Files.newBufferedWriter(path))
+        try (BufferedWriter writer = Files.newBufferedWriter(path, StandardOpenOption.CREATE, StandardOpenOption.APPEND))
         {
             writer.write(recordAsCsv);
 

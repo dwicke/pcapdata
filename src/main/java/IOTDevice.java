@@ -1,6 +1,4 @@
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class IOTDevice {
 
@@ -9,14 +7,28 @@ public class IOTDevice {
     String label;
     int classLabel;
     List<Data> timeseries;
-
+    static Map<String, Integer> labels = new HashMap<>();
+    static int numLabels = 1;
 
     public IOTDevice(String IP, String type, String label) {
         this.IP = IP;
         this.type = type;
         this.label = label;
+        String[] splitType = type.split("-");
+        String deviceType = "";
+        if (splitType.length == 4 || splitType.length == 5) {
+            deviceType = splitType[2];
+        } else if (splitType.length == 3) {
+            deviceType = splitType[1];
+        } else if (splitType.length == 2) {
+            deviceType = splitType[0];
+        }
+        labels.putIfAbsent(deviceType, numLabels);
+        numLabels += 1;
+        System.out.println("numLabels= " + numLabels);
+        classLabel = labels.get(deviceType);
         //tv, audio, tv_dongle, sensor, doorbell, cam, weather, hub, light, switch, other, tablet, router, roomba,game, fitbit
-
+/*
         switch (this.label) {
             case "tv":
                 classLabel = 1;
@@ -67,6 +79,7 @@ public class IOTDevice {
                 classLabel = 16;
                 break;
         }
+        */
         timeseries = new ArrayList<>();
     }
 
@@ -95,6 +108,8 @@ public class IOTDevice {
     public String toString() {
         StringBuilder sb = new StringBuilder(3600);
         sb.append(classLabel);
+        sb.append(" ");
+        sb.append(type);
         sb.append(" ");
         long lastTime = -1;
         for (Data dp : timeseries) {
