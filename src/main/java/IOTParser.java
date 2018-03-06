@@ -11,8 +11,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
@@ -21,6 +23,13 @@ import java.util.zip.GZIPInputStream;
 public class IOTParser {
 
     Map<String, IOTDevice> lookupTable;
+    Map<String, IOTDevice> dataset;
+
+    public IOTParser() {
+        lookupTable = new HashMap<>();
+        dataset = new HashMap<>();
+    }
+
 
     public void writeCSVIOTData(String inputfilename, String outputfilename) throws IOException{
         InputStream fileStream = new FileInputStream(inputfilename);
@@ -39,13 +48,15 @@ public class IOTParser {
                     Buffer buffer = tcpPacket.getPayload();
                     count++;
                     int size = 0;
-                    System.out.println(count);
+                    //System.out.println(count);
                     if (buffer != null) {
-                        System.out.println("payload length: " + buffer.getRawArray().length);
+                        //System.out.println("payload length: " + buffer.getRawArray().length);
                         size = buffer.getRawArray().length;
                     }
-
-                    lookupTable.get(tcpPacket.getSourceIP()).addData(new Data().setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime(tcpPacket.getArrivalTime()));
+                    if (lookupTable.containsKey(tcpPacket.getSourceIP()) && !tcpPacket.getSourceIP().contains(".3.") && !tcpPacket.getSourceIP().contains(".1.")){
+                        dataset.putIfAbsent(tcpPacket.getSourceIP(), lookupTable.get(tcpPacket.getSourceIP()));
+                        lookupTable.get(tcpPacket.getSourceIP()).addData(new Data().setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime(tcpPacket.getArrivalTime()));
+                    }
                 }
 //                } else if (packet.hasProtocol(Protocol.UDP)) {
 //
@@ -78,9 +89,28 @@ public class IOTParser {
     public static void main(String[] args) throws IOException {
 
         IOTParser parser = new IOTParser();
-        parser.processInputFile("/home/drew/devices.txt");
-        parser.writeCSVIOTData("/home/drew/mypcaps/mypcapgz.pcap.gz","/home/drew/tcpdata.txt");
+        parser.processInputFile("/home/dwicke/IOTData/dataset_refs_bro/IOTOnly_labeled.csv");
 
+
+
+        parser.writeCSVIOTData("/home/dwicke/IOTData/2017/01/01/truncated-iot-gateway_eth1_20170101_000102.pcap.gz","/home/dwicke/tcpdata.txt");
+
+        //parser.dataset.values().stream().forEach(System.out::println);
+
+        String recordAsCsv = parser.dataset.values().stream()
+                .map(IOTDevice::toString)
+                .collect(Collectors.joining(System.getProperty("line.separator")));
+
+        Path path = Paths.get("/home/dwicke/tcpdata.txt");
+
+        //Use try-with-resource to get auto-closeable writer instance
+        try (BufferedWriter writer = Files.newBufferedWriter(path))
+        {
+            writer.write(recordAsCsv);
+
+        }
+        //System.out.println("Number of devices operating = " + parser.dataset.values().size());
+        //parser.lookupTable.keySet().stream().forEach(System.out::println);
     }
 
 
@@ -95,7 +125,7 @@ public class IOTParser {
             InputStream inputFS = new FileInputStream(inputF);
             BufferedReader br = new BufferedReader(new InputStreamReader(inputFS));
             // skip the header of the csv
-            inputList = br.lines().skip(1).map((line)-> new IOTDevice(line.split(",")[0], line.split(",")[1])).collect(Collectors.toList());
+            inputList = br.lines().skip(1).map((line)-> new IOTDevice(line.split(",")[0], line.split(",")[2], line.split(",")[3])).collect(Collectors.toList());
             br.close();
         } catch (IOException e) {
         }

@@ -48,4 +48,5 @@ public class Data {
         return Stream.of(source, dest, String.valueOf(dataLength), String.valueOf(arrivalTime))
                 .collect(Collectors.joining(","));
     }
+
 }
