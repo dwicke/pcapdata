@@ -1,6 +1,6 @@
 import java.util.*;
 
-public class IOTDevice {
+public class IOTDevice implements Cloneable{
 
     String IP;
     String type;
@@ -26,6 +26,9 @@ public class IOTDevice {
         labels.putIfAbsent(deviceType, numLabels);
         numLabels += 1;
         System.out.println("numLabels= " + numLabels);
+        if (numLabels == 0) {
+            System.exit(9);
+        }
         classLabel = labels.get(deviceType);
         //tv, audio, tv_dongle, sensor, doorbell, cam, weather, hub, light, switch, other, tablet, router, roomba,game, fitbit
 /*
@@ -85,6 +88,7 @@ public class IOTDevice {
 
 
     public void addData(Data dp) {
+
         timeseries.add(dp);
     }
 
@@ -100,6 +104,10 @@ public class IOTDevice {
         return type;
     }
 
+    public int getClassLabel() {
+        return classLabel;
+    }
+
     public void setType(String type) {
         this.type = type;
     }
@@ -109,8 +117,8 @@ public class IOTDevice {
         StringBuilder sb = new StringBuilder(3600);
         sb.append(classLabel);
         sb.append(" ");
-        sb.append(type);
-        sb.append(" ");
+//        sb.append(type);
+//        sb.append(" ");
         long lastTime = -1;
         for (Data dp : timeseries) {
             if(lastTime == -1 && dp.dataLength > 0) {
@@ -127,5 +135,35 @@ public class IOTDevice {
         System.out.println(sb.toString());
         return sb.toString();
         //return "IP = " + IP + " Device name = " + type + " Number of packets sent = " + timeseries.size() + " total size of data sent = " + timeseries.stream().mapToLong(Data::getDataLength).sum();
+    }
+
+
+    String tsEntry[];
+    int currentIndex = -1;
+    public void reset() {
+        tsEntry = toString().split(" ");
+        currentIndex = 0;
+    }
+
+    public String nextValue() {
+        if (currentIndex == -1) {
+            reset();
+        }
+        return tsEntry[currentIndex++];
+    }
+
+    public boolean hasNextValue() {
+        if (currentIndex == -1) {
+            reset();
+        }
+        return tsEntry.length > 1 && currentIndex < tsEntry.length;
+    }
+
+    public boolean isEmpty() {
+        return timeseries.isEmpty();
+    }
+
+    public IOTDevice getDevice() {
+        return new IOTDevice(IP, type, label);
     }
 }
