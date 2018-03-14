@@ -29,19 +29,24 @@ public class IOTParser {
     }
 
 
-    public void writeCSVIOTData(String inputfilename){
+    public void writeCSVIOTData(String inputfilename, boolean isGZ){
+        System.err.println("Loading file " + inputfilename);
         try {
         InputStream fileStream = new FileInputStream(inputfilename);
-        InputStream gin = new GZIPInputStream(fileStream);
-        final Pcap pcap = Pcap.openStream(gin);
+        if (isGZ) {
+            fileStream = new GZIPInputStream(fileStream);
+        }
+        final Pcap pcap = Pcap.openStream(fileStream);
         final ArrayList<Data> tcpData = new ArrayList<Data>();
 
             pcap.loop(new PacketHandler() {
 
                 double count = 0;
-
+                long timeZero = -1;
                 public boolean nextPacket(Packet packet) throws IOException {
-
+                    if (timeZero == -1) {
+                        timeZero = packet.getArrivalTime();
+                    }
                     if (packet.hasProtocol(Protocol.TCP)) {
 
                         TCPPacket tcpPacket = (TCPPacket) packet.getPacket(Protocol.TCP);
@@ -53,15 +58,18 @@ public class IOTParser {
                             //System.out.println("payload length: " + buffer.getRawArray().length);
                             size = buffer.getRawArray().length;
                         }
-                        if (lookupTable.containsKey(tcpPacket.getSourceIP()) && !tcpPacket.getSourceIP().contains(".3.") && !tcpPacket.getSourceIP().contains(".1.")) {
+                        if (size > 0 && lookupTable.containsKey(tcpPacket.getSourceIP()) && !tcpPacket.getSourceIP().contains(".3.") && !tcpPacket.getSourceIP().contains(".1.")) {
+                            //System.err.println("time = " + (tcpPacket.getArrivalTime() - timeZero) / 1000000);
+
+
                             if (dataset.containsKey(inputfilename + tcpPacket.getSourceIP())) {
-                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime(tcpPacket.getArrivalTime()));
+                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((tcpPacket.getArrivalTime() - timeZero) / 1000000));
                             } else {
                                 dataset.put(inputfilename + tcpPacket.getSourceIP(), lookupTable.get(tcpPacket.getSourceIP()).getDevice());
                             }
                             if (numUses.containsKey(dataset.get(inputfilename + tcpPacket.getSourceIP()).getClassLabel())) {
 
-                                Set<String> hourSet = numUses.get(tcpPacket.getSourceIP());
+                                Set<String> hourSet = numUses.get(dataset.get(inputfilename + tcpPacket.getSourceIP()).getClassLabel());
                                 hourSet.add(inputfilename + tcpPacket.getSourceIP());
                             }else {
                                 Set<String> hourSet = new HashSet<>();
@@ -94,42 +102,42 @@ public class IOTParser {
 
         IOTParser parser = new IOTParser();
         parser.processInputFile("/home/dwicke/IOTData/dataset_refs_bro/IOTOnly_labeled.csv");
+        System.err.println("Loaded labels");
 
-        Files.find(Paths.get("/home/dwicke/IOTData/2017/01/01"),
+        Files.find(Paths.get("/home/dwicke/IOTData/2017/01/"),
                 Integer.MAX_VALUE,
                 (filePath, fileAttr) -> fileAttr.isRegularFile() && filePath.toString().contains(".gz"))
-                .forEach(path -> parser.writeCSVIOTData(path.toString()));
+                .parallel()
+                .forEach(path -> parser.writeCSVIOTData(path.toString(), true));
 
-
+        System.err.println("Finished Loading data going to write");
         Path path = Paths.get("/home/dwicke/tcpdata.txt");
+
 
         //Use try-with-resource to get auto-closeable writer instance
         try (BufferedWriter writer = Files.newBufferedWriter(path, StandardOpenOption.CREATE))
         {
             boolean isDone = false;
-            writer.write("# ");
+            writer.write("#\n");
+
             boolean isFirstLine = true;
-            while (!isDone) {
+            int totalDeviceCount = 0;
+//            while (!isDone) {
                 int numDone = 0;
                 int numDevices = 0;
                 for (IOTDevice iotd : parser.dataset.values()) {
-                    if (parser.numUses.get(iotd.getClassLabel()).size() > 1) {
-                        numDevices++;
-                        if (!iotd.isEmpty()) {
-                            if (iotd.hasNextValue()) {
-                                writer.write(iotd.nextValue() + " ");
-                            } else if (!isFirstLine) {
-                                writer.write("0 ");
-                                numDone++;
-                            }
+                    if (parser.numUses.get(iotd.getClassLabel()).size() > 3) {
+                        System.err.println(numDone + " / " + parser.dataset.values().size());
+                        String data = iotd.toString();
+                        if (!data.isEmpty()) {
+                            writer.write(data);
+                            writer.write("\n");
                         }
+
                     }
+                    numDone++;
                 }
-                isFirstLine = false;
-                writer.write("\n");
-                isDone = numDone == numDevices;
-            }
-            //writer.write(recordAsCsv);
+
 
         }
         //System.out.println("Number of devices operating = " + parser.dataset.values().size());

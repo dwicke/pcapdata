@@ -23,12 +23,13 @@ public class IOTDevice implements Cloneable{
         } else if (splitType.length == 2) {
             deviceType = splitType[0];
         }
-        labels.putIfAbsent(deviceType, numLabels);
-        numLabels += 1;
-        System.out.println("numLabels= " + numLabels);
-        if (numLabels == 0) {
-            System.exit(9);
+        if (!labels.containsKey(deviceType)) {
+            labels.put(deviceType, numLabels);
+            numLabels++;
         }
+
+        //System.out.println("numLabels= " + numLabels);
+
         classLabel = labels.get(deviceType);
         //tv, audio, tv_dongle, sensor, doorbell, cam, weather, hub, light, switch, other, tablet, router, roomba,game, fitbit
 /*
@@ -114,6 +115,24 @@ public class IOTDevice implements Cloneable{
 
     @Override
     public String toString() {
+        StringBuilder sb = new StringBuilder(7200);
+        sb.append(classLabel);
+        sb.append(" ");
+//        sb.append(type);
+//        sb.append(" ");
+
+        double ts[] = new double[3601];
+
+        timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
+        Arrays.stream(ts).forEach(s -> sb.append(s + " "));
+
+
+        //System.out.println(sb.toString());
+        return sb.toString();
+        //return "IP = " + IP + " Device name = " + type + " Number of packets sent = " + timeseries.size() + " total size of data sent = " + timeseries.stream().mapToLong(Data::getDataLength).sum();
+    }
+
+    public String OLDtoString() {
         StringBuilder sb = new StringBuilder(3600);
         sb.append(classLabel);
         sb.append(" ");
@@ -132,7 +151,7 @@ public class IOTDevice implements Cloneable{
                 sb.append(" ");
             }
         }
-        System.out.println(sb.toString());
+        //System.out.println(sb.toString());
         return sb.toString();
         //return "IP = " + IP + " Device name = " + type + " Number of packets sent = " + timeseries.size() + " total size of data sent = " + timeseries.stream().mapToLong(Data::getDataLength).sum();
     }
