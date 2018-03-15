@@ -111,7 +111,7 @@ public class IOTParser {
                 .forEach(path -> parser.writeCSVIOTData(path.toString(), true));
 
         System.err.println("Finished Loading data going to write");
-        Path path = Paths.get("/home/dwicke/tcpdata.txt");
+        Path path = Paths.get("/home/dwicke/tcpdataHeavyLightTraffic.txt");
 
 
         //Use try-with-resource to get auto-closeable writer instance

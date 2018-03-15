@@ -83,7 +83,7 @@ public class IOTDevice implements Cloneable{
                 classLabel = 16;
                 break;
         }
-        */
+*/
         timeseries = new ArrayList<>();
     }
 
@@ -116,14 +116,27 @@ public class IOTDevice implements Cloneable{
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(7200);
-        sb.append(classLabel);
-        sb.append(" ");
+//        sb.append(classLabel);
+//        sb.append(" ");
 //        sb.append(type);
 //        sb.append(" ");
 
         double ts[] = new double[3601];
 
         timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
+
+        int count = 0;
+        for (int i =0; i < ts.length; i++){
+            if (ts[i] > 0) {
+                count++;
+            }
+        }
+        // so heavy traffic is 1 and light traffic is type 2
+        if (count > ts.length / 4) {
+            sb.append("1 ");
+        } else {
+            sb.append("2 ");
+        }
         Arrays.stream(ts).forEach(s -> sb.append(s + " "));
 
 
