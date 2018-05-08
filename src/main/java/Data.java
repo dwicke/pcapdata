@@ -7,6 +7,7 @@ public class Data {
     String dest;
     int dataLength;
     long arrivalTime;
+    int protocol;
 
     public String getSource() {
         return source;
@@ -42,6 +43,14 @@ public class Data {
     public Data setArrivalTime(long arrivalTime) {
         this.arrivalTime = arrivalTime;
         return this;
+    }
+
+    public Data setProtocol(int protocol) {
+        this.protocol = protocol;
+        return this;
+    }
+    public int getProtocol() {
+        return protocol;
     }
 
     public String toCsvRow() {

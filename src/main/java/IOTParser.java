@@ -25,12 +25,12 @@ public class IOTParser {
 
     Map<String, IOTDevice> lookupTable;
     Map<String, IOTDevice> dataset;
-    Map<Integer, Set<String>> numUses;
+   // Map<Integer, Set<String>> numUses;
 
     public IOTParser() {
         lookupTable = new HashMap<>();
         dataset = new HashMap<>();
-        numUses = new HashMap<>();
+        //numUses = new HashMap<>();
     }
 
 
@@ -52,6 +52,7 @@ public class IOTParser {
                     if (timeZero == -1) {
                         timeZero = packet.getArrivalTime();
                     }
+
                     if (packet.hasProtocol(Protocol.TCP)) {
 
                         TCPPacket tcpPacket = (TCPPacket) packet.getPacket(Protocol.TCP);
@@ -63,34 +64,43 @@ public class IOTParser {
                             //System.out.println("payload length: " + buffer.getRawArray().length);
                             size = buffer.getRawArray().length;
                         }
-                        if (size > 0 && lookupTable.containsKey(tcpPacket.getSourceIP()) && !tcpPacket.getSourceIP().contains(".3.") && !tcpPacket.getSourceIP().contains(".1.")) {
+                        if (size > 0 && lookupTable.containsKey(tcpPacket.getSourceIP()) && tcpPacket.getSourceIP().contains("172.16.2.") && tcpPacket.getSourceIP().contains("172.16.10.")) {
                             //System.err.println("time = " + (tcpPacket.getArrivalTime() - timeZero) / 1000000);
 
-
+                            // check if i already have looked at data with this ip in this file
                             if (dataset.containsKey(inputfilename + tcpPacket.getSourceIP())) {
-                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((tcpPacket.getArrivalTime() - timeZero) / 1000000));
+                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setProtocol(1).setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((tcpPacket.getArrivalTime() - timeZero) / 1000000));
                             } else {
                                 dataset.put(inputfilename + tcpPacket.getSourceIP(), lookupTable.get(tcpPacket.getSourceIP()).getDevice());
-                            }
-                            if (numUses.containsKey(dataset.get(inputfilename + tcpPacket.getSourceIP()).getClassLabel())) {
+                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setProtocol(1).setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((tcpPacket.getArrivalTime() - timeZero) / 1000000));
 
-                                Set<String> hourSet = numUses.get(dataset.get(inputfilename + tcpPacket.getSourceIP()).getClassLabel());
-                                hourSet.add(inputfilename + tcpPacket.getSourceIP());
-                            }else {
-                                Set<String> hourSet = new HashSet<>();
-                                hourSet.add(inputfilename + tcpPacket.getSourceIP());
-                                numUses.put(lookupTable.get(tcpPacket.getSourceIP()).getDevice().getClassLabel(), hourSet);
+                            }
+
+                        }
+                    } else if (packet.hasProtocol(Protocol.UDP)) {
+
+                        UDPPacket udpPacket = (UDPPacket) packet.getPacket(Protocol.UDP);
+                        Buffer buffer = udpPacket.getPayload();
+                        int size = 0;
+                        if (buffer != null) {
+                            //System.out.println("payload length: " + buffer.getRawArray().length);
+                            size = buffer.getRawArray().length;
+                        }
+                        if (buffer != null && lookupTable.containsKey(udpPacket.getSourceIP()) && udpPacket.getSourceIP().contains("172.16.2.") && !udpPacket.getSourceIP().contains("172.16.10.")) {
+                            //System.out.println("Source" + udpPacket.getSourceIP() + " UDP: " + buffer);
+
+                            if (dataset.containsKey(inputfilename + udpPacket.getSourceIP())) {
+                                dataset.get(inputfilename + udpPacket.getSourceIP()).addData(new Data().setProtocol(2).setSource(udpPacket.getSourceIP()).setDest(udpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((udpPacket.getArrivalTime() - timeZero) / 1000000));
+                            } else {
+                                dataset.put(inputfilename + udpPacket.getSourceIP(), lookupTable.get(udpPacket.getSourceIP()).getDevice());
+                                dataset.get(inputfilename + udpPacket.getSourceIP()).addData(new Data().setProtocol(2).setSource(udpPacket.getSourceIP()).setDest(udpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((udpPacket.getArrivalTime() - timeZero) / 1000000));
+
                             }
                         }
+
+
+
                     }
-//                } else if (packet.hasProtocol(Protocol.UDP)) {
-//
-//                    UDPPacket udpPacket = (UDPPacket) packet.getPacket(Protocol.UDP);
-//                    Buffer buffer = udpPacket.getPayload();
-//                    if (buffer != null) {
-//                        System.out.println("UDP: " + buffer);
-//                    }
-//                }
                     return true;
                 }
             });
@@ -174,10 +184,10 @@ public class IOTParser {
         IOTParser parserTest = new IOTParser();
         ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/01/03/");
 
-        doMUSE(mts, mtsTest);
+//        doMUSE(mts, mtsTest);
 
-
-
+        writeForTSAT(mts, "IoTDataTrainUDP.json");
+        writeForTSAT(mtsTest, "IoTDataTestUDP.json");
 //        for(int i =0; i < mts.get(0).timeSeries[1].getData().length; i++) {
 //            //if (mts.get(0).timeSeries[1].getData()[i] != 0)
 //                System.err.println(mts.get(0).timeSeries[1].getData()[i]);
@@ -247,9 +257,9 @@ public class IOTParser {
         return mtsSamples;
     }
 
-    public static void writeForTSAT(ArrayList<MultiVariateTimeSeries> mts) throws IOException {
+    public static void writeForTSAT(ArrayList<MultiVariateTimeSeries> mts, String fileName) throws IOException {
         Gson gson = new Gson();
-        try(BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/dwicke/IoTDataTest.json"), StandardOpenOption.CREATE)) {
+        try(BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/dwicke/" + fileName), StandardOpenOption.CREATE)) {
             writer.write(gson.toJson(mts));
         }
     }
