@@ -136,6 +136,19 @@ public class IOTDevice implements Cloneable{
         TimeSeries tss[] = new TimeSeries[2];
         tss[0] = getDataTimeSeries();
         tss[1] = getIATTS();
+        boolean isMine = true;
+        for (int i =0; i < tss[1].getData().length; i++) {
+            if (tss[1].getData()[i] > 0 && tss[1].getData()[i] != 202.0) {
+                isMine = false;
+                break;
+            }
+        }
+        if (isMine) {
+            for (int i =0; i < tss[0].getData().length; i++) {
+//                if (tss[0].getData()[i] > 0)
+//                    System.err.println("corresponding data = " + tss[0].getData()[i]);
+            }
+        }
         return new MultiVariateTimeSeries(tss, (double) classLabel);
     }
 
@@ -143,18 +156,45 @@ public class IOTDevice implements Cloneable{
         double ts[] = new double[3601];
 
         timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
+        for (int i =0 ; i < ts.length; i++){
+            if (ts[i] > 0 && ts[i] != 202.0) {
+               // System.err.println("ts [" + i + "] = " + ts[i]);
+            }
+        }
+
+
         return new TimeSeries(ts, (double) classLabel);
     }
 
     public TimeSeries getIATTS() {
-        ArrayList<Double> iat = new ArrayList<>();
-        timeseries.stream().forEach(dp -> iat.add( dp.arrivalTime - (iat.size() == 0 ? 0 : iat.get(iat.size() - 1))));
-        double ts[] = new double[iat.size()];
-        for (int i = 0; i < iat.size(); i++) {
-            ts[i] = iat.get(i);
-        }
+//        ArrayList<Double> iat = new ArrayList<>();
+//        timeseries.stream().forEach(dp -> iat.add( dp.arrivalTime - (iat.size() == 0 ? 0 : iat.get(iat.size() - 1))));
+//        double ts[] = new double[iat.size()];
+//        for (int i = 0; i < iat.size(); i++) {
+//            ts[i] = iat.get(i);
+//        }
 
-        return new TimeSeries(ts , (double) classLabel);
+
+        double iat[] = new double[3601];
+        int lastArrival = 0;
+        double arrivalTimes[] = new double[timeseries.size()];
+        //System.err.println("Time series size = " + timeseries.size());
+        for (int i =0; i < timeseries.size(); i++) {
+            arrivalTimes[i] = timeseries.get(i).arrivalTime;
+        }
+        Arrays.sort(arrivalTimes);
+        //System.err.println("arrival time = " + (int)arrivalTimes[0] + " size of iat = " + iat.length);
+        iat[(int)arrivalTimes[0]] = (int)arrivalTimes[0];
+        for (int i = 1; i < arrivalTimes.length; i++) {
+            iat[(int)arrivalTimes[i]] = (int)arrivalTimes[i] - (int)arrivalTimes[i - 1];
+            if (iat[(int)arrivalTimes[i]] == 202) {
+                System.err.println("inter arrival time = " + (int)arrivalTimes[i] + " - " + (int)arrivalTimes[i - 1] + " = " + iat[(int)arrivalTimes[i]]);
+            }
+        }
+       // timeseries.stream().forEach(dp -> iat[(int) dp.arrivalTime] = dp.arrivalTime - ((int) dp.arrivalTime == 0 ? 0 : iat[(int) dp.arrivalTime - 1]));
+
+
+        return new TimeSeries(iat , (double) classLabel);
     }
 
 
@@ -167,9 +207,11 @@ public class IOTDevice implements Cloneable{
 //        sb.append(" ");
 
         double ts[] = new double[3601];
-        ArrayList<Long> iat = new ArrayList<>();
+        //ArrayList<Long> iat = new ArrayList<>();
         timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
-        timeseries.stream().forEach(dp -> iat.add( dp.arrivalTime - (iat.size() == 0 ? 0 : iat.get(iat.size() - 1))));
+        //timeseries.stream().forEach(dp -> iat.add( dp.arrivalTime - (iat.size() == 0 ? 0 : iat.get(iat.size() - 1))));
+        double iat[] = new double[3601];
+        timeseries.stream().forEach(dp -> iat[(int) dp.arrivalTime] = dp.arrivalTime - ((int) dp.arrivalTime == 0 ? 0 : iat[(int) dp.arrivalTime - 1]));
 
 //        int count = 0;
 //        for (int i =0; i < ts.length; i++){
