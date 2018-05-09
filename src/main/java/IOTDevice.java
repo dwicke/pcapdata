@@ -174,18 +174,29 @@ public class IOTDevice implements Cloneable{
 
         double iat[] = new double[3601];
         int lastArrival = 0;
-        double arrivalTimes[] = new double[timeseries.size()];
+        //double arrivalTimes[] = new double[timeseries.size()];
+
+        ArrayList<Double> arrivalTimes = new ArrayList<>();
         //System.err.println("Time series size = " + timeseries.size());
+        boolean hasData = false;
         for (int i =0; i < timeseries.size(); i++) {
-            arrivalTimes[i] = timeseries.get(i).arrivalTime;
+            if (timeseries.get(i).getIsSendOrRecv() == IOTParser.RECV) {
+                arrivalTimes.add((double)timeseries.get(i).arrivalTime);
+                hasData = true;
+            }
         }
-        Arrays.sort(arrivalTimes);
-        //System.err.println("arrival time = " + (int)arrivalTimes[0] + " size of iat = " + iat.length);
-        iat[(int)arrivalTimes[0]] = (int)arrivalTimes[0];
-        for (int i = 1; i < arrivalTimes.length; i++) {
-            if (iat[(int)arrivalTimes[i]] == 0) {
-                // only add the first one otherwise loose info
-                iat[(int) arrivalTimes[i]] = (int) arrivalTimes[i] - (int) arrivalTimes[i - 1];
+        if (hasData) {
+            Collections.sort(arrivalTimes);
+
+
+//        Arrays.sort(arrivalTimes);
+            //System.err.println("arrival time = " + (int)arrivalTimes[0] + " size of iat = " + iat.length);
+            iat[arrivalTimes.get(0).intValue()] = arrivalTimes.get(0);
+            for (int i = 1; i < arrivalTimes.size(); i++) {
+                if (iat[arrivalTimes.get(i).intValue()] == 0) {
+                    // only add the first one otherwise loose info
+                    iat[arrivalTimes.get(i).intValue()] = arrivalTimes.get(i).intValue() - arrivalTimes.get(i - 1).intValue();
+                }
             }
         }
        // timeseries.stream().forEach(dp -> iat[(int) dp.arrivalTime] = dp.arrivalTime - ((int) dp.arrivalTime == 0 ? 0 : iat[(int) dp.arrivalTime - 1]));

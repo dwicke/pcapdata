@@ -8,6 +8,7 @@ public class Data {
     int dataLength;
     long arrivalTime;
     int protocol;
+    int sendOrRecv;
 
     public String getSource() {
         return source;
@@ -53,6 +54,13 @@ public class Data {
         return protocol;
     }
 
+    public Data setSendorRecv(int sendorrecv) {
+        this.sendOrRecv = sendorrecv;
+        return this;
+    }
+    public int getIsSendOrRecv() {
+        return sendOrRecv;
+    }
     public String toCsvRow() {
         return Stream.of(source, dest, String.valueOf(dataLength), String.valueOf(arrivalTime))
                 .collect(Collectors.joining(","));

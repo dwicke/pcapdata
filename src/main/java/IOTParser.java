@@ -25,6 +25,12 @@ public class IOTParser {
 
     Map<String, IOTDevice> lookupTable;
     Map<String, IOTDevice> dataset;
+    public static int SEND = 1;
+    public static int RECV = 2;
+
+    public static int TCP = 1;
+    public static int UDP = 2;
+
    // Map<Integer, Set<String>> numUses;
 
     public IOTParser() {
@@ -64,19 +70,10 @@ public class IOTParser {
                             //System.out.println("payload length: " + buffer.getRawArray().length);
                             size = buffer.getRawArray().length;
                         }
-                        if (size > 0 && lookupTable.containsKey(tcpPacket.getSourceIP()) && tcpPacket.getSourceIP().contains("172.16.2.") && tcpPacket.getSourceIP().contains("172.16.10.")) {
-                            //System.err.println("time = " + (tcpPacket.getArrivalTime() - timeZero) / 1000000);
+                        // String key, String lookupTableKey, String sourceIP, String destIP, int size, int protocol, int arrivalTime
+                        updateDataset(inputfilename + tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, (tcpPacket.getArrivalTime() - timeZero) / 1000000, SEND);
+                        updateDataset(inputfilename + tcpPacket.getDestinationIP(), tcpPacket.getDestinationIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, (tcpPacket.getArrivalTime() - timeZero) / 1000000, RECV);
 
-                            // check if i already have looked at data with this ip in this file
-                            if (dataset.containsKey(inputfilename + tcpPacket.getSourceIP())) {
-                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setProtocol(1).setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((tcpPacket.getArrivalTime() - timeZero) / 1000000));
-                            } else {
-                                dataset.put(inputfilename + tcpPacket.getSourceIP(), lookupTable.get(tcpPacket.getSourceIP()).getDevice());
-                                dataset.get(inputfilename + tcpPacket.getSourceIP()).addData(new Data().setProtocol(1).setSource(tcpPacket.getSourceIP()).setDest(tcpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((tcpPacket.getArrivalTime() - timeZero) / 1000000));
-
-                            }
-
-                        }
                     } else if (packet.hasProtocol(Protocol.UDP)) {
 
                         UDPPacket udpPacket = (UDPPacket) packet.getPacket(Protocol.UDP);
@@ -86,17 +83,22 @@ public class IOTParser {
                             //System.out.println("payload length: " + buffer.getRawArray().length);
                             size = buffer.getRawArray().length;
                         }
-                        if (buffer != null && lookupTable.containsKey(udpPacket.getSourceIP()) && udpPacket.getSourceIP().contains("172.16.2.") && !udpPacket.getSourceIP().contains("172.16.10.")) {
-                            //System.out.println("Source" + udpPacket.getSourceIP() + " UDP: " + buffer);
+                        // going to have both sending and receiving data.  The data that the IoT device receives
+                        // is included along with the sending.
+                        updateDataset(inputfilename + udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, (udpPacket.getArrivalTime() - timeZero) / 1000000, SEND);
+                        updateDataset(inputfilename + udpPacket.getDestinationIP(), udpPacket.getDestinationIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, (udpPacket.getArrivalTime() - timeZero) / 1000000, RECV);
 
-                            if (dataset.containsKey(inputfilename + udpPacket.getSourceIP())) {
-                                dataset.get(inputfilename + udpPacket.getSourceIP()).addData(new Data().setProtocol(2).setSource(udpPacket.getSourceIP()).setDest(udpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((udpPacket.getArrivalTime() - timeZero) / 1000000));
-                            } else {
-                                dataset.put(inputfilename + udpPacket.getSourceIP(), lookupTable.get(udpPacket.getSourceIP()).getDevice());
-                                dataset.get(inputfilename + udpPacket.getSourceIP()).addData(new Data().setProtocol(2).setSource(udpPacket.getSourceIP()).setDest(udpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((udpPacket.getArrivalTime() - timeZero) / 1000000));
-
-                            }
-                        }
+//                        if (buffer != null && lookupTable.containsKey(udpPacket.getSourceIP()) && udpPacket.getSourceIP().contains("172.16.2.") && !udpPacket.getSourceIP().contains("172.16.10.")) {
+//                            //System.out.println("Source" + udpPacket.getSourceIP() + " UDP: " + buffer);
+//
+//                            if (dataset.containsKey(inputfilename + udpPacket.getSourceIP())) {
+//                                dataset.get(inputfilename + udpPacket.getSourceIP()).addData(new Data().setProtocol(2).setSource(udpPacket.getSourceIP()).setDest(udpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((udpPacket.getArrivalTime() - timeZero) / 1000000));
+//                            } else {
+//                                dataset.put(inputfilename + udpPacket.getSourceIP(), lookupTable.get(udpPacket.getSourceIP()).getDevice());
+//                                dataset.get(inputfilename + udpPacket.getSourceIP()).addData(new Data().setProtocol(2).setSource(udpPacket.getSourceIP()).setDest(udpPacket.getDestinationIP()).setDataLength(size).setArrivalTime((udpPacket.getArrivalTime() - timeZero) / 1000000));
+//
+//                            }
+//                        }
 
 
 
@@ -108,6 +110,21 @@ public class IOTParser {
 
         }
 
+    }
+
+
+    public void  updateDataset(String key, String lookupTableKey, String sourceIP, String destIP, int size, int protocol, long arrivalTime, int sendOrReceive) {
+        if (size > 0 && lookupTable.containsKey(lookupTableKey) && lookupTableKey.contains("172.16.2.") || lookupTableKey.contains("172.16.10.")) {
+            //System.err.println("time = " + (tcpPacket.getArrivalTime() - timeZero) / 1000000);
+            // check if i already have looked at data with this ip in this file
+            if (dataset.containsKey(key)) {
+                dataset.get(key).addData(new Data().setSendorRecv(sendOrReceive).setProtocol(protocol).setSource(sourceIP).setDest(destIP).setDataLength(size).setArrivalTime(arrivalTime));
+            } else {
+                dataset.put(key, lookupTable.get(lookupTableKey).getDevice());
+                dataset.get(key).addData(new Data().setSendorRecv(sendOrReceive).setProtocol(protocol).setSource(sourceIP).setDest(destIP).setDataLength(size).setArrivalTime(arrivalTime));
+            }
+
+        }
     }
 
 
@@ -180,7 +197,7 @@ public class IOTParser {
 //        }
 
         IOTParser parserTrain = new IOTParser();
-        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/01/");
+        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/01");
         IOTParser parserTest = new IOTParser();
         ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/01/03/");
 
