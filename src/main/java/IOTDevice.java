@@ -13,6 +13,12 @@ public class IOTDevice implements Cloneable{
     List<Data> timeseries;
     static Map<String, Integer> labels = new HashMap<>();
     static int numLabels = 1;
+    long TS_INTERVAL = 3600000000L; // one hour in us (micro seconds)
+    final int tsLength = 1000;
+
+    int MAX = 0;
+    int TOTAL = 1;
+    int AVG = 2;
 
     public IOTDevice(String IP, String type, String label) {
         this.IP = IP;
@@ -134,9 +140,15 @@ public class IOTDevice implements Cloneable{
     }
 
     public MultiVariateTimeSeries getMTS() {
-        TimeSeries tss[] = new TimeSeries[2];
-        tss[0] = getDataTimeSeries();
+        TimeSeries tss[] = new TimeSeries[7];
+        tss[0] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.SEND);
         tss[1] = getIATTS();
+        tss[2] = getDataTimeSeries(TOTAL, IOTParser.TCP, IOTParser.SEND);
+        tss[3] = getDataTimeSeries(AVG, IOTParser.TCP, IOTParser.SEND);
+        // new ones
+        tss[4] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.SEND);
+        tss[5] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.RECV);
+        tss[6] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.RECV);
         boolean isMine = true;
         for (int i =0; i < tss[1].getData().length; i++) {
             if (tss[1].getData()[i] > 0 && tss[1].getData()[i] != 202.0) {
@@ -153,142 +165,96 @@ public class IOTDevice implements Cloneable{
         return new MultiVariateTimeSeries(tss, (double) classLabel);
     }
 
-    public TimeSeries getDataTimeSeries() {
-        double ts[] = new double[3601];
+    public TimeSeries getDataTimeSeries(int type, int protocol, int sendOrRecv) {
+        double ts[] = new double[tsLength];
 
-        timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
+        //timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
+        int index = 0;
+        long start = -1;
 
+        Collections.sort(timeseries, new Comparator<Data>() {
+            @Override
+            public int compare(Data o1, Data o2) {
+                return ((Long)o1.arrivalTime).compareTo(o2.arrivalTime);
+            }
+        });
+
+        int count = 0;
+        for (int i = 0; i < timeseries.size(); i++) {
+            if (timeseries.get(i).getProtocol() == protocol && timeseries.get(i).getIsSendOrRecv() == sendOrRecv) {
+                if (start == -1) {
+                    start = timeseries.get(i).getArrivalTime();
+                }
+                if (timeseries.get(i).getArrivalTime() - start <= TS_INTERVAL) {
+                    if (type == MAX) {
+                        ts[index] = Math.max(ts[index], timeseries.get(i).getDataLength());
+                    } else {
+                        ts[index] += timeseries.get(i).getDataLength();
+                    }
+                    count++;
+                    if (timeseries.get(i).getArrivalTime() - start < 0)
+                        System.err.println("diff = " + (timeseries.get(i).getArrivalTime() - start) + "Arrival time = " + timeseries.get(i).getArrivalTime() + " start time = " + start);
+                } else {
+                    if (type == AVG) {
+                        ts[index] = ts[index] / (double) count;
+                    }
+                    index++;
+                    start = timeseries.get(i).getArrivalTime();
+
+                    ts[index] += timeseries.get(i).getDataLength();
+                }
+            }
+        }
 
 
         return new TimeSeries(ts, (double) classLabel);
     }
 
     public TimeSeries getIATTS() {
-//        ArrayList<Double> iat = new ArrayList<>();
-//        timeseries.stream().forEach(dp -> iat.add( dp.arrivalTime - (iat.size() == 0 ? 0 : iat.get(iat.size() - 1))));
-//        double ts[] = new double[iat.size()];
-//        for (int i = 0; i < iat.size(); i++) {
-//            ts[i] = iat.get(i);
-//        }
 
 
-        double iat[] = new double[3601];
-        int lastArrival = 0;
+        double iat[] = new double[tsLength];
+
         //double arrivalTimes[] = new double[timeseries.size()];
 
-        ArrayList<Double> arrivalTimes = new ArrayList<>();
-        //System.err.println("Time series size = " + timeseries.size());
-        boolean hasData = false;
-        for (int i =0; i < timeseries.size(); i++) {
-            if (timeseries.get(i).getIsSendOrRecv() == IOTParser.RECV) {
-                arrivalTimes.add((double)timeseries.get(i).arrivalTime);
-                hasData = true;
+        Collections.sort(timeseries, new Comparator<Data>() {
+            @Override
+            public int compare(Data o1, Data o2) {
+                return ((Long)o1.arrivalTime).compareTo(o2.arrivalTime);
             }
-        }
-        if (hasData) {
-            Collections.sort(arrivalTimes);
+        });
+        int startIndex = 0;
+        //while (timeseries.get(startIndex).getIsSendOrRecv() != IOTParser.SEND || timeseries.get(i).getProtocol() != IOTParser.TCP) { startIndex++; }
+        long start = timeseries.get(startIndex).getArrivalTime();
+        int index = 0;
+        long prev = timeseries.get(startIndex).getArrivalTime();
+        int count = 0;
+        startIndex++;
+        for (int i = startIndex; i < timeseries.size(); i++) {
+            if (timeseries.get(i).getIsSendOrRecv() == IOTParser.SEND && timeseries.get(i).getProtocol() == IOTParser.TCP) {
 
+                if (timeseries.get(i).getArrivalTime() - start <= TS_INTERVAL) {
+                    //iat[index] += (((double)(timeseries.get(i).getArrivalTime() - start)) / 1000000.0) - (((double)(prev - start)) / 1000000.0);
+                    iat[index] += (((double)(timeseries.get(i).getArrivalTime() - start))) - (((double)(prev - start)));
+                    count++;
+                    //System.err.println("count = " + count + " Start = " + (((double)(timeseries.get(i).getArrivalTime() - start)) / 1000000.0) + " prev-start = " + (((double)(prev - start)) / 1000000.0) + " total = " + iat[index]);
 
-//        Arrays.sort(arrivalTimes);
-            //System.err.println("arrival time = " + (int)arrivalTimes[0] + " size of iat = " + iat.length);
-            iat[arrivalTimes.get(0).intValue()] = arrivalTimes.get(0);
-            for (int i = 1; i < arrivalTimes.size(); i++) {
-                if (iat[arrivalTimes.get(i).intValue()] == 0) {
-                    // only add the first one otherwise loose info
-                    iat[arrivalTimes.get(i).intValue()] = arrivalTimes.get(i).intValue() - arrivalTimes.get(i - 1).intValue();
+                    prev = timeseries.get(i).getArrivalTime();
+                    if (timeseries.get(i).getArrivalTime() - start < 0)
+                        System.err.println("diff = " + (timeseries.get(i).getArrivalTime() - start) + "Arrival time = " + timeseries.get(i).getArrivalTime() + " start time = " + start);
+                } else {
+                    if (count > 0 && iat[index] > 0) {
+                        iat[index] = iat[index] / (double) count;
+                    }
+                    count = 0;
+                    index++;
+                    start = timeseries.get(i).getArrivalTime();
+                    prev = start;
                 }
             }
         }
-       // timeseries.stream().forEach(dp -> iat[(int) dp.arrivalTime] = dp.arrivalTime - ((int) dp.arrivalTime == 0 ? 0 : iat[(int) dp.arrivalTime - 1]));
-
 
         return new TimeSeries(iat , (double) classLabel);
-    }
-
-
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder(7200);
-//        sb.append(classLabel);
-//        sb.append(" ");
-//        sb.append(type);
-//        sb.append(" ");
-
-        double ts[] = new double[3601];
-        //ArrayList<Long> iat = new ArrayList<>();
-        timeseries.stream().forEach(dp -> ts[(int) dp.arrivalTime] += dp.dataLength);
-        //timeseries.stream().forEach(dp -> iat.add( dp.arrivalTime - (iat.size() == 0 ? 0 : iat.get(iat.size() - 1))));
-        double iat[] = new double[3601];
-        timeseries.stream().forEach(dp -> iat[(int) dp.arrivalTime] = dp.arrivalTime - ((int) dp.arrivalTime == 0 ? 0 : iat[(int) dp.arrivalTime - 1]));
-
-//        int count = 0;
-//        for (int i =0; i < ts.length; i++){
-//            if (ts[i] > 0) {
-//                count++;
-//            }
-//        }
-//        // so heavy traffic is 1 and light traffic is type 2
-//        if (count > ts.length / 4) {
-//            sb.append("1 ");
-//        } else {
-//            sb.append("2 ");
-//        }
-//        Arrays.stream(ts).forEach(s -> sb.append(s + " "));
-
-
-        //System.out.println(sb.toString());
-        return sb.toString();
-        //return "IP = " + IP + " Device name = " + type + " Number of packets sent = " + timeseries.size() + " total size of data sent = " + timeseries.stream().mapToLong(Data::getDataLength).sum();
-    }
-
-    public String OLDtoString() {
-        StringBuilder sb = new StringBuilder(3600);
-        sb.append(classLabel);
-        sb.append(" ");
-//        sb.append(type);
-//        sb.append(" ");
-        long lastTime = -1;
-        for (Data dp : timeseries) {
-            if(lastTime == -1 && dp.dataLength > 0) {
-                lastTime = dp.getArrivalTime();
-                sb.append(dp.dataLength);
-                sb.append(" ");
-            } else if (lastTime != -1) {
-                int secondsElapsed = (int) ((dp.arrivalTime - lastTime) / 1000000000);
-                sb.append(String.join("", Collections.nCopies(secondsElapsed, "0 ")));
-                sb.append(dp.dataLength);
-                sb.append(" ");
-            }
-        }
-        //System.out.println(sb.toString());
-        return sb.toString();
-        //return "IP = " + IP + " Device name = " + type + " Number of packets sent = " + timeseries.size() + " total size of data sent = " + timeseries.stream().mapToLong(Data::getDataLength).sum();
-    }
-
-
-    String tsEntry[];
-    int currentIndex = -1;
-    public void reset() {
-        tsEntry = toString().split(" ");
-        currentIndex = 0;
-    }
-
-    public String nextValue() {
-        if (currentIndex == -1) {
-            reset();
-        }
-        return tsEntry[currentIndex++];
-    }
-
-    public boolean hasNextValue() {
-        if (currentIndex == -1) {
-            reset();
-        }
-        return tsEntry.length > 1 && currentIndex < tsEntry.length;
-    }
-
-    public boolean isEmpty() {
-        return timeseries.isEmpty();
     }
 
     public IOTDevice getDevice() {
