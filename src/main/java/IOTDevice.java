@@ -140,6 +140,13 @@ public class IOTDevice implements Cloneable{
     }
 
     public MultiVariateTimeSeries getMTS() {
+
+
+
+
+
+
+
         TimeSeries tss[] = new TimeSeries[7];
         tss[0] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.SEND);
         tss[1] = getIATTS();
@@ -183,15 +190,22 @@ public class IOTDevice implements Cloneable{
                     if (timeseries.get(i).getArrivalTime() - start < 0)
                         System.err.println("diff = " + (timeseries.get(i).getArrivalTime() - start) + "Arrival time = " + timeseries.get(i).getArrivalTime() + " start time = " + start);
                 } else {
-                    if (type == AVG) {
+                    if (type == AVG && count > 0) {
+                        // it might be that there was only a single value within a whole hour so need to ensure count > 0
                         ts[index] = ts[index] / (double) count;
                     }
+                    count = 0;
                     index++;
                     start = timeseries.get(i).getArrivalTime();
 
                     ts[index] += timeseries.get(i).getDataLength();
                 }
             }
+
+            if (type == AVG && count > 0 && ts[index] > 0) {
+                ts[index] = ts[index] / (double) count;
+            }
+
         }
 
 

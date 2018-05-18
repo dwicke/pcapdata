@@ -135,7 +135,7 @@ public class IOTParser {
             if (iotd.timeseries.size() > 0) {
                 MultiVariateTimeSeries mtsa = iotd.getMTS();
                 if (mtsa.timeSeries[0].getLength() > 0 && mtsa.timeSeries[1].getLength() > 0) {
-                    mts.add(iotd.getMTS());
+                    mts.add(mtsa);
                     int lab = iotd.getClassLabel();
                     if (labels.containsKey(lab)) {
                         labels.put(lab, labels.get(lab) + 1);
@@ -155,46 +155,48 @@ public class IOTParser {
     }
 
     public static void main(String[] args) throws IOException {
+
+        createFullYearDataset();
+    // "/home/dwicke/IOTData/2017/01/01/"
+
+    }
+
+    public static  void createOneDayDataset(String pathToDay, String outFile, int[] timeSeries) throws IOException{
+        IOTParser parserTrain = new IOTParser();
+        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries(pathToDay);
+        writeForTSAT(mts, outFile);
+    }
+
+    public static void createTwoMonthDataset() throws IOException{
+        IOTParser parserTrain = new IOTParser();
+        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/");
+        writeForTSAT(mts, "IoTDataTrainUDP.json");
+
+        IOTParser parserTest = new IOTParser();
+        ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/02/");
+        writeForTSAT(mtsTest, "IoTDataTestUDP.json");
+    }
+
+    public static void createFullYearDataset() {
         ArrayList<ArrayList<MultiVariateTimeSeries>> months = new ArrayList<>();
-
-
-
-
-        for(int i = 12; i <= 12; i++) {// month 3 and 10 gives me errors and 11 doesn't exist
+        for(int i = 1; i <= 12; i++) {// month 3 and 10 gives me errors and 11 doesn't exist
             try {
                 String date = "";
-                    if (i < 10 && i != 3) {
-                        date = "0" + i;
-                    }else if (i > 11) {
-                        date = "" + i;
-                    }else {
-                        continue;
-                    }
+                if (i < 10 && i != 3) {
+                    date = "0" + i;
+                }else if (i > 11) {
+                    date = "" + i;
+                }else {
+                    continue;
+                }
                 ArrayList<MultiVariateTimeSeries> m = new IOTParser().getTimeSeries("/home/dwicke/IOTData/2017/"+date+"/");
                 writeForTSAT(m, "IoTTraining/testFullYear/IoTData" + date + ".json");
                 months.add(m);
 
             } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                e.printStackTrace();
+            }
         }
-
-
-
-
-
-
-
-//        IOTParser parserTrain = new IOTParser();
-//        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/");
-//        writeForTSAT(mts, "IoTDataTrainUDP.json");
-//
-//        IOTParser parserTest = new IOTParser();
-//        ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/02/");
-//        writeForTSAT(mtsTest, "IoTDataTestUDP.json");
-
-//        doMUSE(mts, mtsTest);
-
     }
 
 
