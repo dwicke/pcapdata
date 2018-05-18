@@ -155,16 +155,43 @@ public class IOTParser {
     }
 
     public static void main(String[] args) throws IOException {
+        ArrayList<ArrayList<MultiVariateTimeSeries>> months = new ArrayList<>();
 
 
 
-        IOTParser parserTrain = new IOTParser();
-        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/");
-        writeForTSAT(mts, "IoTDataTrainUDP.json");
 
-        IOTParser parserTest = new IOTParser();
-        ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/02/");
-        writeForTSAT(mtsTest, "IoTDataTestUDP.json");
+        for(int i = 12; i <= 12; i++) {// month 3 and 10 gives me errors and 11 doesn't exist
+            try {
+                String date = "";
+                    if (i < 10 && i != 3) {
+                        date = "0" + i;
+                    }else if (i > 11) {
+                        date = "" + i;
+                    }else {
+                        continue;
+                    }
+                ArrayList<MultiVariateTimeSeries> m = new IOTParser().getTimeSeries("/home/dwicke/IOTData/2017/"+date+"/");
+                writeForTSAT(m, "IoTTraining/testFullYear/IoTData" + date + ".json");
+                months.add(m);
+
+            } catch (IOException e) {
+                    e.printStackTrace();
+                }
+        }
+
+
+
+
+
+
+
+//        IOTParser parserTrain = new IOTParser();
+//        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/");
+//        writeForTSAT(mts, "IoTDataTrainUDP.json");
+//
+//        IOTParser parserTest = new IOTParser();
+//        ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/02/");
+//        writeForTSAT(mtsTest, "IoTDataTestUDP.json");
 
 //        doMUSE(mts, mtsTest);
 

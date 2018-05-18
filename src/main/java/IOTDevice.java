@@ -149,19 +149,7 @@ public class IOTDevice implements Cloneable{
         tss[4] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.SEND);
         tss[5] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.RECV);
         tss[6] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.RECV);
-        boolean isMine = true;
-        for (int i =0; i < tss[1].getData().length; i++) {
-            if (tss[1].getData()[i] > 0 && tss[1].getData()[i] != 202.0) {
-                isMine = false;
-                break;
-            }
-        }
-        if (isMine) {
-            for (int i =0; i < tss[0].getData().length; i++) {
-//                if (tss[0].getData()[i] > 0)
-//                    System.err.println("corresponding data = " + tss[0].getData()[i]);
-            }
-        }
+
         return new MultiVariateTimeSeries(tss, (double) classLabel);
     }
 
