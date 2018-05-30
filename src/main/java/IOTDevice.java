@@ -14,11 +14,12 @@ public class IOTDevice implements Cloneable{
     static Map<String, Integer> labels = new HashMap<>();
     static int numLabels = 1;
     long TS_INTERVAL = 3600000000L; // one hour in us (micro seconds)
-    final int tsLength = 1000;
+    final int tsLength = 3601;
 
     int MAX = 0;
     int TOTAL = 1;
     int AVG = 2;
+    int ACTUAL = 3;
 
     public IOTDevice(String IP, String type, String label) {
         this.IP = IP;
@@ -139,24 +140,29 @@ public class IOTDevice implements Cloneable{
         this.type = type;
     }
 
-    public MultiVariateTimeSeries getMTS() {
+    public MultiVariateTimeSeries getMTS(boolean isHour) {
 
 
-
-
-
-
-
-        TimeSeries tss[] = new TimeSeries[7];
-        tss[0] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.SEND);
-        tss[1] = getIATTS();
-        tss[2] = getDataTimeSeries(TOTAL, IOTParser.TCP, IOTParser.SEND);
-        tss[3] = getDataTimeSeries(AVG, IOTParser.TCP, IOTParser.SEND);
-        // new ones
-        tss[4] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.SEND);
-        tss[5] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.RECV);
-        tss[6] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.RECV);
-
+        TimeSeries tss[] = null;
+        if (!isHour) {
+            tss = new TimeSeries[7];
+            tss[0] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.SEND);
+            tss[1] = getIATTS(AVG);
+            tss[2] = getDataTimeSeries(TOTAL, IOTParser.TCP, IOTParser.SEND);
+            tss[3] = getDataTimeSeries(AVG, IOTParser.TCP, IOTParser.SEND);
+            // new ones
+            tss[4] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.SEND);
+            tss[5] = getDataTimeSeries(MAX, IOTParser.TCP, IOTParser.RECV);
+            tss[6] = getDataTimeSeries(MAX, IOTParser.UDP, IOTParser.RECV);
+        } else {
+            // it is hour data so we have different time series
+            tss = new TimeSeries[5];
+            tss[0] = getDataTimeSeries(ACTUAL, IOTParser.TCP, IOTParser.SEND);
+            tss[1] = getDataTimeSeries(ACTUAL, IOTParser.TCP, IOTParser.RECV);
+            tss[2] = getDataTimeSeries(ACTUAL, IOTParser.UDP, IOTParser.SEND);
+            tss[3] = getDataTimeSeries(ACTUAL, IOTParser.UDP, IOTParser.RECV);
+            tss[4] = getIATTS(ACTUAL);
+        }
         return new MultiVariateTimeSeries(tss, (double) classLabel);
     }
 
@@ -183,8 +189,10 @@ public class IOTDevice implements Cloneable{
                 if (timeseries.get(i).getArrivalTime() - start <= TS_INTERVAL) {
                     if (type == MAX) {
                         ts[index] = Math.max(ts[index], timeseries.get(i).getDataLength());
-                    } else {
+                    } else if (type != ACTUAL){
                         ts[index] += timeseries.get(i).getDataLength();
+                    } else if (type == ACTUAL) {
+                        ts[(int) ((timeseries.get(i).getArrivalTime() - start) / 1000000)] += timeseries.get(i).getDataLength();
                     }
                     count++;
                     if (timeseries.get(i).getArrivalTime() - start < 0)
@@ -197,8 +205,9 @@ public class IOTDevice implements Cloneable{
                     count = 0;
                     index++;
                     start = timeseries.get(i).getArrivalTime();
-
-                    ts[index] += timeseries.get(i).getDataLength();
+                    if (type != ACTUAL) {
+                        ts[index] += timeseries.get(i).getDataLength();
+                    }
                 }
             }
 
@@ -212,7 +221,7 @@ public class IOTDevice implements Cloneable{
         return new TimeSeries(ts, (double) classLabel);
     }
 
-    public TimeSeries getIATTS() {
+    public TimeSeries getIATTS(int type) {
 
 
         double iat[] = new double[tsLength];
@@ -237,15 +246,24 @@ public class IOTDevice implements Cloneable{
 
                 if (timeseries.get(i).getArrivalTime() - start <= TS_INTERVAL) {
                     //iat[index] += (((double)(timeseries.get(i).getArrivalTime() - start)) / 1000000.0) - (((double)(prev - start)) / 1000000.0);
-                    iat[index] += (((double)(timeseries.get(i).getArrivalTime() - start))) - (((double)(prev - start)));
-                    count++;
-                    //System.err.println("count = " + count + " Start = " + (((double)(timeseries.get(i).getArrivalTime() - start)) / 1000000.0) + " prev-start = " + (((double)(prev - start)) / 1000000.0) + " total = " + iat[index]);
 
-                    prev = timeseries.get(i).getArrivalTime();
+                    if (type == ACTUAL) {
+                        iat[ (int)((timeseries.get(i).getArrivalTime() - start) / 1000000)] += (((double)(timeseries.get(i).getArrivalTime() - start))) - (((double)(prev - start)));
+                        count++;
+                        //System.err.println("count = " + count + " Start = " + (((double)(timeseries.get(i).getArrivalTime() - start)) / 1000000.0) + " prev-start = " + (((double)(prev - start)) / 1000000.0) + " total = " + iat[index]);
+
+                        prev = timeseries.get(i).getArrivalTime();
+                    } else {
+                        iat[index] += (((double) (timeseries.get(i).getArrivalTime() - start))) - (((double) (prev - start)));
+                        count++;
+                        //System.err.println("count = " + count + " Start = " + (((double)(timeseries.get(i).getArrivalTime() - start)) / 1000000.0) + " prev-start = " + (((double)(prev - start)) / 1000000.0) + " total = " + iat[index]);
+
+                        prev = timeseries.get(i).getArrivalTime();
+                    }
                     if (timeseries.get(i).getArrivalTime() - start < 0)
                         System.err.println("diff = " + (timeseries.get(i).getArrivalTime() - start) + "Arrival time = " + timeseries.get(i).getArrivalTime() + " start time = " + start);
                 } else {
-                    if (count > 0 && iat[index] > 0) {
+                    if (count > 0 && iat[index] > 0 && type == AVG) {
                         iat[index] = iat[index] / (double) count;
                     }
                     count = 0;

@@ -38,7 +38,7 @@ public class IOTParser {
     }
 
 
-    public void writeCSVIOTData(String inputfilename, boolean isGZ){
+    public void writeCSVIOTData(String inputfilename, boolean isGZ, boolean useInputFileName){
         System.err.println("Loading file " + inputfilename);
         try {
         InputStream fileStream = new FileInputStream(inputfilename);
@@ -70,9 +70,15 @@ public class IOTParser {
                         }
                         //(tcpPacket.getArrivalTime() - timeZero) / 1000000
                         // String key, String lookupTableKey, String sourceIP, String destIP, int size, int protocol, int arrivalTime
-                        updateDataset(tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, tcpPacket.getArrivalTime(), SEND);
-                        updateDataset(tcpPacket.getDestinationIP(), tcpPacket.getDestinationIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP,  tcpPacket.getArrivalTime(), RECV);
+                        if (useInputFileName) {
+                            updateDataset(inputfilename + tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, tcpPacket.getArrivalTime(), SEND);
+                            updateDataset(inputfilename + tcpPacket.getDestinationIP(), tcpPacket.getDestinationIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, tcpPacket.getArrivalTime(), RECV);
+                        }
+                        else {
+                            updateDataset(tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, tcpPacket.getArrivalTime(), SEND);
+                            updateDataset(tcpPacket.getDestinationIP(), tcpPacket.getDestinationIP(), tcpPacket.getSourceIP(), tcpPacket.getDestinationIP(), size, TCP, tcpPacket.getArrivalTime(), RECV);
 
+                        }
                     } else if (packet.hasProtocol(Protocol.UDP)) {
 
                         UDPPacket udpPacket = (UDPPacket) packet.getPacket(Protocol.UDP);
@@ -85,9 +91,15 @@ public class IOTParser {
                         // going to have both sending and receiving data.  The data that the IoT device receives
                         // is included along with the sending.
                         //(udpPacket.getArrivalTime() - timeZero) / 1000000
-                        updateDataset(udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, udpPacket.getArrivalTime(), SEND);
-                        updateDataset(udpPacket.getDestinationIP(), udpPacket.getDestinationIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, udpPacket.getArrivalTime(), RECV);
+                        if (useInputFileName) {
+                            updateDataset(inputfilename + udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, udpPacket.getArrivalTime(), SEND);
+                            updateDataset(inputfilename + udpPacket.getDestinationIP(), udpPacket.getDestinationIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, udpPacket.getArrivalTime(), RECV);
+                        }
+                        else {
+                            updateDataset(udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, udpPacket.getArrivalTime(), SEND);
+                            updateDataset(udpPacket.getDestinationIP(), udpPacket.getDestinationIP(), udpPacket.getSourceIP(), udpPacket.getDestinationIP(), size, UDP, udpPacket.getArrivalTime(), RECV);
 
+                        }
 //
 
 
@@ -118,7 +130,7 @@ public class IOTParser {
     }
 
 
-    public ArrayList<MultiVariateTimeSeries> getTimeSeries(String inputFile) throws IOException{
+    public ArrayList<MultiVariateTimeSeries> getTimeSeries(String inputFile, boolean isHourData) throws IOException{
         processInputFile("/home/dwicke/IOTData/dataset_refs_bro/IOTOnly_simple.csv");
         System.err.println("Loaded labels");
 
@@ -126,14 +138,14 @@ public class IOTParser {
                 Integer.MAX_VALUE,
                 (filePath, fileAttr) -> fileAttr.isRegularFile() && filePath.toString().contains(".gz"))
                 .parallel()
-                .forEach(path -> writeCSVIOTData(path.toString(), true));
+                .forEach(path -> writeCSVIOTData(path.toString(), true, isHourData));
 
         System.err.println("Finished Loading data going to write");
         ArrayList<MultiVariateTimeSeries> mts = new ArrayList<>();
         Map<Integer, Integer> labels = new HashMap<>();
         for (IOTDevice iotd : dataset.values()) {
             if (iotd.timeseries.size() > 0) {
-                MultiVariateTimeSeries mtsa = iotd.getMTS();
+                MultiVariateTimeSeries mtsa = iotd.getMTS(isHourData);
                 if (mtsa.timeSeries[0].getLength() > 0 && mtsa.timeSeries[1].getLength() > 0) {
                     mts.add(mtsa);
                     int lab = iotd.getClassLabel();
@@ -156,24 +168,27 @@ public class IOTParser {
 
     public static void main(String[] args) throws IOException {
 
-        createFullYearDataset();
+//        createFullYearDataset();
     // "/home/dwicke/IOTData/2017/01/01/"
+
+        createOneDayDataset("/home/dwicke/IOTData/2017/01/01/", "IoTTraining/OneHourTests/FirstAndThird/rawTrain0101.json");
+        createOneDayDataset("/home/dwicke/IOTData/2017/01/03/", "IoTTraining/OneHourTests/FirstAndThird/rawTest0103.json");
 
     }
 
-    public static  void createOneDayDataset(String pathToDay, String outFile, int[] timeSeries) throws IOException{
+    public static  void createOneDayDataset(String pathToDay, String outFile) throws IOException{
         IOTParser parserTrain = new IOTParser();
-        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries(pathToDay);
+        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries(pathToDay, true);
         writeForTSAT(mts, outFile);
     }
 
     public static void createTwoMonthDataset() throws IOException{
         IOTParser parserTrain = new IOTParser();
-        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/");
+        ArrayList<MultiVariateTimeSeries> mts = parserTrain.getTimeSeries("/home/dwicke/IOTData/2017/01/", false);
         writeForTSAT(mts, "IoTDataTrainUDP.json");
 
         IOTParser parserTest = new IOTParser();
-        ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/02/");
+        ArrayList<MultiVariateTimeSeries> mtsTest = parserTest.getTimeSeries("/home/dwicke/IOTData/2017/02/", false);
         writeForTSAT(mtsTest, "IoTDataTestUDP.json");
     }
 
@@ -189,7 +204,7 @@ public class IOTParser {
                 }else {
                     continue;
                 }
-                ArrayList<MultiVariateTimeSeries> m = new IOTParser().getTimeSeries("/home/dwicke/IOTData/2017/"+date+"/");
+                ArrayList<MultiVariateTimeSeries> m = new IOTParser().getTimeSeries("/home/dwicke/IOTData/2017/"+date+"/", false);
                 writeForTSAT(m, "IoTTraining/testFullYear/IoTData" + date + ".json");
                 months.add(m);
 
